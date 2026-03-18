@@ -17,6 +17,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // Store defines a key-value storage in scrt.
@@ -114,4 +115,45 @@ func (s Store) UnsetContext(ctx context.Context, key string) {
 	logger := getLogger(ctx)
 	logger.WithField("key", key).Info("unsetting value for key")
 	delete(s.data, key)
+}
+
+// ListPrefix returns all keys that start with the given prefix.
+func (s Store) ListPrefix(prefix string) []string {
+	return s.ListPrefixContext(context.Background(), prefix)
+}
+
+// ListPrefixContext returns all keys that start with the given prefix.
+func (s Store) ListPrefixContext(ctx context.Context, prefix string) []string {
+	logger := getLogger(ctx)
+	logger.Debug("store.ListPrefix")
+
+	keys := make([]string, 0)
+	for k := range s.data {
+		if prefix == "" || strings.HasPrefix(k, prefix) {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
+// UnsetPrefix removes all keys that start with the given prefix.
+// Returns the number of keys removed.
+func (s Store) UnsetPrefix(prefix string) int {
+	return s.UnsetPrefixContext(context.Background(), prefix)
+}
+
+// UnsetPrefixContext removes all keys that start with the given prefix.
+// Returns the number of keys removed.
+func (s Store) UnsetPrefixContext(ctx context.Context, prefix string) int {
+	logger := getLogger(ctx)
+	logger.Debug("store.UnsetPrefix")
+
+	count := 0
+	for k := range s.data {
+		if strings.HasPrefix(k, prefix) {
+			delete(s.data, k)
+			count++
+		}
+	}
+	return count
 }
