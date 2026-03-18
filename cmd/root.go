@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/loderunner/scrt/backend"
+	"github.com/iminaii/iscrt/backend"
 )
 
 var (
@@ -44,10 +44,10 @@ func (f fielder) Fields() log.Fields {
 	return f.fields
 }
 
-// RootCmd is the root command for scrt.
+// RootCmd is the root command for iscrt.
 var RootCmd = &cobra.Command{
-	Use:   "scrt",
-	Short: "A secret manager for the command-line",
+	Use:   "iscrt",
+	Short: "A secret manager for the command-line with .env file support (fork of scrt)",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Short circuit for storage command
 		if cmd == storageCmd {

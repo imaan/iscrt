@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 
-	"github.com/loderunner/scrt/backend"
+	"github.com/iminaii/iscrt/backend"
 )
 
 func TestRootCmd(t *testing.T) {

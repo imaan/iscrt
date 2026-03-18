@@ -20,7 +20,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/loderunner/scrt/cmd"
+	"github.com/iminaii/iscrt/cmd"
 )
 
 var version = "dev"

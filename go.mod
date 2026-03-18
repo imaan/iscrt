@@ -1,4 +1,4 @@
-module github.com/loderunner/scrt
+module github.com/iminaii/iscrt
 
 go 1.26
 

@@ -1,5 +1,6 @@
 builds:
-  - env:
+  - binary: iscrt
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
@@ -29,46 +30,14 @@ nfpms:
     replacements:
       '386': i386
       amd64: x86_64
-    homepage: https://scrt.run
-    maintainer: Charles Francoise <scrt@scrt.run>
-    description: A secret manager for the command-line
+    homepage: https://github.com/iminaii/iscrt
+    maintainer: iminaii
+    description: A secret manager for the command-line with .env file support (fork of scrt)
     license: Apache 2.0
     formats:
       - deb
       - rpm
     section: devel
-    rpm:
-      signature:
-        key_file: key.gpg
-    deb:
-      signature:
-        key_file: key.gpg
-brews:
-  - goarm: '6'
-    tap:
-      owner: loderunner
-      name: homebrew-scrt
-    url_template: 'https://homebrew.scrt.run/{{ .Tag }}/{{ .ArtifactName }}'
-    commit_author:
-      name: Charles Francoise
-      email: scrt@scrt.run
-    homepage: 'https://scrt.run'
-    description: 'A secret manager for the command-line'
-    license: 'Apache-2.0'
-    install: bin.install "scrt"
-    test: system "#{bin}/scrt --version"
-    skip_upload: auto
-dockers:
-  # Tag release
-  - image_templates:
-      - 'loderunner/scrt:{{ .Major }}'
-      - 'loderunner/scrt:{{ .Major }}.{{ .Minor }}'
-      - 'loderunner/scrt:{{ .Major }}.{{ .Minor }}.{{ .Patch }}'
-      - 'loderunner/scrt:latest'
-    skip_push: auto
-  # Prerelease
-  - image_templates:
-      - 'loderunner/scrt:{{ .Version }}'
 checksum:
   name_template: 'checksums.txt'
   ids:
@@ -76,5 +45,8 @@ checksum:
 snapshot:
   name_template: '{{ .RawVersion }}-dev-{{ .ShortCommit }}'
 release:
+  github:
+    owner: iminaii
+    name: iscrt
   ids:
     - default

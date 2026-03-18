@@ -50,7 +50,7 @@ var (
 var _ = BeforeSuite(func() {
 	var err error
 
-	executablePath, err = gexec.Build("github.com/loderunner/scrt")
+	executablePath, err = gexec.Build("github.com/iminaii/iscrt")
 	Expect(err).NotTo(HaveOccurred())
 })
 

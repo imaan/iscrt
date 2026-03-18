@@ -20,8 +20,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/loderunner/scrt/backend"
-	"github.com/loderunner/scrt/store"
+	"github.com/iminaii/iscrt/backend"
+	"github.com/iminaii/iscrt/store"
 )
 
 var initCmd = &cobra.Command{

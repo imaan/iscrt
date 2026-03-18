@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	"github.com/loderunner/scrt/store"
+	"github.com/iminaii/iscrt/store"
 )
 
 type mockS3Client struct {
