@@ -28,4 +28,4 @@ formatters:
       sections:
         - standard
         - default
-        - prefix(github.com/loderunner/scrt)
+        - prefix(github.com/iminaii/iscrt)
