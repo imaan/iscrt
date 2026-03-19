@@ -63,12 +63,13 @@ func parseEnvFile(path string) (map[string]string, error) {
 }
 
 // writeEnvFile writes key-value pairs to a .env file with a header.
+// writeEnvFile writes key-value pairs to a .env file with a header.
+// Uses 0600 permissions to protect secret values.
 func writeEnvFile(path string, vars map[string]string, project string) error {
-	f, err := os.Create(path)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 
 	w := bufio.NewWriter(f)
 
@@ -89,5 +90,9 @@ func writeEnvFile(path string, vars map[string]string, project string) error {
 		fmt.Fprintf(w, "%s=%s\n", k, vars[k])
 	}
 
-	return w.Flush()
+	if err := w.Flush(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }

@@ -42,6 +42,10 @@ var pushCmd = &cobra.Command{
 
 // envPush reads a .env file and stores all keys under the project prefix.
 func envPush(file string, project string, mode string) error {
+	if mode != "merge" && mode != "replace" {
+		return fmt.Errorf("invalid mode %q, must be 'merge' or 'replace'", mode)
+	}
+
 	vars, err := parseEnvFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", file, err)
@@ -265,7 +269,7 @@ var listEnvCmd = &cobra.Command{
 				return nil
 			}
 			for _, p := range projects {
-				fmt.Printf("%-30s %d keys\n", p.name, p.count)
+				fmt.Printf("%-20s (%d secrets)\n", p.name, p.count)
 			}
 			return nil
 		}
@@ -279,7 +283,7 @@ var listEnvCmd = &cobra.Command{
 			return nil
 		}
 		for _, e := range entries {
-			fmt.Printf("%-30s %s\n", e.key, e.maskedValue)
+			fmt.Printf("  %-20s = %s\n", e.key, e.maskedValue)
 		}
 		return nil
 	},
@@ -399,10 +403,14 @@ func init() {
 // --- env delete ---
 
 var deleteCmd = &cobra.Command{
-	Use:   "delete",
+	Use:   "delete [project]",
 	Short: "Delete project secrets from the store",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		project, _ := cmd.Flags().GetString("project")
+		if project == "" && len(args) > 0 {
+			project = args[0]
+		}
 		if project == "" {
 			project = currentDirName()
 		}
