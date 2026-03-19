@@ -47,7 +47,7 @@ func TestRootCmd(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	viper.Set(configKeyPassword, "")
+	viper.Set(configKeyPassword, "test-password")
 	err = RootCmd.PersistentPreRunE(RootCmd, []string{})
 	if err != nil {
 		t.Fatal(err)
