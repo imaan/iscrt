@@ -7,3 +7,4 @@ key.gpg
 node_modules
 .temp
 .cache
+iscrt
