@@ -1,4 +1,4 @@
-module github.com/iminaii/iscrt
+module github.com/imaan/iscrt
 
 go 1.26
 

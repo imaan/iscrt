@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/iminaii/iscrt/backend"
+	"github.com/imaan/iscrt/backend"
 )
 
 func padRight(s string, pad string, length int) string {

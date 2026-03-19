@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:generate mockgen -destination mock_backend.go -package cmd "github.com/iminaii/iscrt/backend" Backend
+//go:generate mockgen -destination mock_backend.go -package cmd "github.com/imaan/iscrt/backend" Backend
 
 package cmd
 
@@ -23,8 +23,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 
-	"github.com/iminaii/iscrt/backend"
-	"github.com/iminaii/iscrt/store"
+	"github.com/imaan/iscrt/backend"
+	"github.com/imaan/iscrt/store"
 )
 
 func TestSetCmd(t *testing.T) {

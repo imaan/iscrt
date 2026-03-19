@@ -28,4 +28,4 @@ formatters:
       sections:
         - standard
         - default
-        - prefix(github.com/iminaii/iscrt)
+        - prefix(github.com/imaan/iscrt)

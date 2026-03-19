@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/iminaii/iscrt/backend"
-	"github.com/iminaii/iscrt/store"
+	"github.com/imaan/iscrt/backend"
+	"github.com/imaan/iscrt/store"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

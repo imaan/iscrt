@@ -30,8 +30,8 @@ nfpms:
     replacements:
       '386': i386
       amd64: x86_64
-    homepage: https://github.com/iminaii/iscrt
-    maintainer: iminaii
+    homepage: https://github.com/imaan/iscrt
+    maintainer: imaan
     description: A secret manager for the command-line with .env file support (fork of scrt)
     license: Apache 2.0
     formats:
@@ -46,7 +46,7 @@ snapshot:
   name_template: '{{ .RawVersion }}-dev-{{ .ShortCommit }}'
 release:
   github:
-    owner: iminaii
+    owner: imaan
     name: iscrt
   ids:
     - default

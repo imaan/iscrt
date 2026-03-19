@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/iminaii/iscrt/backend"
-	"github.com/iminaii/iscrt/store"
+	"github.com/imaan/iscrt/backend"
+	"github.com/imaan/iscrt/store"
 	"github.com/spf13/viper"
 )
 

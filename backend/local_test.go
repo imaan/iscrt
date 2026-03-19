@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/afero"
 
-	"github.com/iminaii/iscrt/store"
+	"github.com/imaan/iscrt/store"
 )
 
 func TestLocalExists(t *testing.T) {

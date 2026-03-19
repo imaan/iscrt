@@ -20,7 +20,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/iminaii/iscrt/cmd"
+	"github.com/imaan/iscrt/cmd"
 )
 
 var version = "dev"

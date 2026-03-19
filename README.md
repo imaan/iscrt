@@ -19,7 +19,7 @@ scrt handled the encryption perfectly. I added the project and `.env` layer on t
 ## Install
 
 ```bash
-go install github.com/iminaii/iscrt@latest
+go install github.com/imaan/iscrt@latest
 ```
 
 ## Setup
