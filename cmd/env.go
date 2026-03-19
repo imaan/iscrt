@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/iminaii/iscrt/backend"
@@ -220,6 +221,159 @@ func envPull(file string, project string, force bool) error {
 	return nil
 }
 
+// --- env list ---
+
+type projectInfo struct {
+	name  string
+	count int
+}
+
+type keyEntry struct {
+	key         string
+	maskedValue string
+}
+
+func maskValue(val string, reveal bool) string {
+	if reveal {
+		return val
+	}
+	if len(val) <= 6 {
+		return "******"
+	}
+	return val[:4] + "***"
+}
+
+var listEnvCmd = &cobra.Command{
+	Use:   "list [project]",
+	Short: "List projects or keys in a project",
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		project, _ := cmd.Flags().GetString("project")
+		if project == "" && len(args) > 0 {
+			project = args[0]
+		}
+		reveal, _ := cmd.Flags().GetBool("reveal")
+
+		if project == "" {
+			projects, err := envListProjects()
+			if err != nil {
+				return err
+			}
+			if len(projects) == 0 {
+				fmt.Println("No projects found.")
+				return nil
+			}
+			for _, p := range projects {
+				fmt.Printf("%-30s %d keys\n", p.name, p.count)
+			}
+			return nil
+		}
+
+		entries, err := envListKeys(project, reveal)
+		if err != nil {
+			return err
+		}
+		if len(entries) == 0 {
+			fmt.Printf("No keys found for project %q.\n", project)
+			return nil
+		}
+		for _, e := range entries {
+			fmt.Printf("%-30s %s\n", e.key, e.maskedValue)
+		}
+		return nil
+	},
+}
+
+func envListProjects() ([]projectInfo, error) {
+	storage := viper.GetString(configKeyStorage)
+	password := []byte(viper.GetString(configKeyPassword))
+
+	b, err := backend.Backends[storage].NewContext(cmdContext, viper.AllSettings())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backend: %w", err)
+	}
+	exists, err := b.ExistsContext(cmdContext)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("store not initialized, run 'iscrt init' first")
+	}
+
+	data, err := b.LoadContext(cmdContext)
+	if err != nil {
+		return nil, err
+	}
+	s, err := store.ReadStoreContext(cmdContext, password, data)
+	if err != nil {
+		return nil, err
+	}
+
+	all := s.ListContext(cmdContext)
+	counts := make(map[string]int)
+	for _, key := range all {
+		idx := strings.Index(key, "/")
+		if idx < 0 {
+			continue
+		}
+		project := key[:idx]
+		counts[project]++
+	}
+
+	result := make([]projectInfo, 0, len(counts))
+	for name, count := range counts {
+		result = append(result, projectInfo{name: name, count: count})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].name < result[j].name
+	})
+	return result, nil
+}
+
+func envListKeys(project string, reveal bool) ([]keyEntry, error) {
+	storage := viper.GetString(configKeyStorage)
+	password := []byte(viper.GetString(configKeyPassword))
+
+	b, err := backend.Backends[storage].NewContext(cmdContext, viper.AllSettings())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backend: %w", err)
+	}
+	exists, err := b.ExistsContext(cmdContext)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("store not initialized, run 'iscrt init' first")
+	}
+
+	data, err := b.LoadContext(cmdContext)
+	if err != nil {
+		return nil, err
+	}
+	s, err := store.ReadStoreContext(cmdContext, password, data)
+	if err != nil {
+		return nil, err
+	}
+
+	prefix := project + "/"
+	keys := s.ListPrefixContext(cmdContext, prefix)
+	sort.Strings(keys)
+
+	entries := make([]keyEntry, 0, len(keys))
+	for _, fullKey := range keys {
+		val, err := s.GetContext(cmdContext, fullKey)
+		if err != nil {
+			return nil, err
+		}
+		envKey := strings.TrimPrefix(fullKey, prefix)
+		entries = append(entries, keyEntry{
+			key:         envKey,
+			maskedValue: maskValue(string(val), reveal),
+		})
+	}
+	return entries, nil
+}
+
 func init() {
 	addCommand(envCmd)
 
@@ -230,4 +384,8 @@ func init() {
 	envCmd.AddCommand(pullCmd)
 	pullCmd.Flags().String("project", "", "project name (default: current directory name)")
 	pullCmd.Flags().BoolP("force", "f", false, "overwrite existing file")
+
+	envCmd.AddCommand(listEnvCmd)
+	listEnvCmd.Flags().String("project", "", "project name")
+	listEnvCmd.Flags().BoolP("reveal", "r", false, "show full values instead of masked")
 }

@@ -188,3 +188,83 @@ func TestEnvPullNoForceExistingFile(t *testing.T) {
 		t.Fatal("expected error when file exists without --force")
 	}
 }
+
+func TestEnvListProjects(t *testing.T) {
+	_, cleanup := setupTestStore(t)
+	defer cleanup()
+
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	os.WriteFile(envPath, []byte("KEY1=val1\nKEY2=val2\n"), 0644)
+	envPush(envPath, "alpha", "merge")
+
+	os.WriteFile(envPath, []byte("KEY3=val3\n"), 0644)
+	envPush(envPath, "beta", "merge")
+
+	projects, err := envListProjects()
+	if err != nil {
+		t.Fatalf("list projects failed: %v", err)
+	}
+	if len(projects) != 2 {
+		t.Fatalf("expected 2 projects, got %d", len(projects))
+	}
+
+	found := make(map[string]int)
+	for _, p := range projects {
+		found[p.name] = p.count
+	}
+	if found["alpha"] != 2 {
+		t.Errorf("expected alpha=2, got %d", found["alpha"])
+	}
+	if found["beta"] != 1 {
+		t.Errorf("expected beta=1, got %d", found["beta"])
+	}
+}
+
+func TestEnvListKeys(t *testing.T) {
+	_, cleanup := setupTestStore(t)
+	defer cleanup()
+
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	os.WriteFile(envPath, []byte("DB_HOST=localhost\nAPI_KEY=sk-abcdef123\n"), 0644)
+	envPush(envPath, "myproject", "merge")
+
+	entries, err := envListKeys("myproject", false)
+	if err != nil {
+		t.Fatalf("list keys failed: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+
+	for _, e := range entries {
+		if e.key == "API_KEY" && e.maskedValue != "sk-a***" {
+			t.Errorf("expected masked 'sk-a***', got %q", e.maskedValue)
+		}
+		if e.key == "DB_HOST" && e.maskedValue != "loca***" {
+			t.Errorf("expected masked 'loca***', got %q", e.maskedValue)
+		}
+	}
+}
+
+func TestMaskValue(t *testing.T) {
+	tests := []struct {
+		val, expected string
+		reveal        bool
+	}{
+		{"abcdefgh", "abcd***", false},
+		{"abc", "******", false},
+		{"abc123", "******", false},   // exactly 6 chars
+		{"abcdefg", "abcd***", false}, // exactly 7 chars
+		{"abcdefgh", "abcdefgh", true},
+		{"abc", "abc", true},
+	}
+
+	for _, tt := range tests {
+		got := maskValue(tt.val, tt.reveal)
+		if got != tt.expected {
+			t.Errorf("maskValue(%q, %v) = %q, want %q", tt.val, tt.reveal, got, tt.expected)
+		}
+	}
+}
