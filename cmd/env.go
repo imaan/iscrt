@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/iminaii/iscrt/backend"
 	"github.com/iminaii/iscrt/store"
@@ -143,11 +144,90 @@ func currentDirName() string {
 	return filepath.Base(dir)
 }
 
+// --- env pull ---
+
+var pullCmd = &cobra.Command{
+	Use:   "pull [file]",
+	Short: "Pull project secrets into a .env file",
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		file := ".env"
+		if len(args) > 0 {
+			file = args[0]
+		}
+		project, _ := cmd.Flags().GetString("project")
+		if project == "" {
+			project = currentDirName()
+		}
+		force, _ := cmd.Flags().GetBool("force")
+		return envPull(file, project, force)
+	},
+}
+
+func envPull(file string, project string, force bool) error {
+	// If file exists and not force, error
+	if !force {
+		if _, err := os.Stat(file); err == nil {
+			return fmt.Errorf("%s already exists, use --force to overwrite", file)
+		}
+	}
+
+	storage := viper.GetString(configKeyStorage)
+	password := []byte(viper.GetString(configKeyPassword))
+
+	b, err := backend.Backends[storage].NewContext(cmdContext, viper.AllSettings())
+	if err != nil {
+		return fmt.Errorf("failed to create backend: %w", err)
+	}
+	exists, err := b.ExistsContext(cmdContext)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("store not initialized, run 'iscrt init' first")
+	}
+
+	data, err := b.LoadContext(cmdContext)
+	if err != nil {
+		return err
+	}
+	s, err := store.ReadStoreContext(cmdContext, password, data)
+	if err != nil {
+		return err
+	}
+
+	prefix := project + "/"
+	keys := s.ListPrefixContext(cmdContext, prefix)
+	if len(keys) == 0 {
+		return fmt.Errorf("no secrets found for project %q", project)
+	}
+
+	vars := make(map[string]string, len(keys))
+	for _, key := range keys {
+		val, err := s.GetContext(cmdContext, key)
+		if err != nil {
+			return err
+		}
+		envKey := strings.TrimPrefix(key, prefix)
+		vars[envKey] = string(val)
+	}
+
+	if err := writeEnvFile(file, vars, project); err != nil {
+		return err
+	}
+
+	fmt.Printf("Pulled %d secrets from project %q to %s\n", len(vars), project, file)
+	return nil
+}
+
 func init() {
 	addCommand(envCmd)
 
 	envCmd.AddCommand(pushCmd)
-
 	pushCmd.Flags().String("project", "", "project name (default: current directory name)")
 	pushCmd.Flags().String("mode", "merge", "push mode: merge or replace")
+
+	envCmd.AddCommand(pullCmd)
+	pullCmd.Flags().String("project", "", "project name (default: current directory name)")
+	pullCmd.Flags().BoolP("force", "f", false, "overwrite existing file")
 }

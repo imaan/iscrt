@@ -147,3 +147,44 @@ func TestEnvPushMergePreservesExisting(t *testing.T) {
 		t.Error("EXISTING_KEY should be preserved in merge mode")
 	}
 }
+
+func TestEnvPull(t *testing.T) {
+	dir, cleanup := setupTestStore(t)
+	defer cleanup()
+
+	// Push secrets first
+	envPath := filepath.Join(dir, "source.env")
+	os.WriteFile(envPath, []byte("DB_HOST=localhost\nAPI_KEY=sk-123\n"), 0644)
+	envPush(envPath, "test-project", "merge")
+
+	// Pull to new file
+	outPath := filepath.Join(dir, ".env")
+	err := envPull(outPath, "test-project", true)
+	if err != nil {
+		t.Fatalf("pull failed: %v", err)
+	}
+
+	vars, err := parseEnvFile(outPath)
+	if err != nil {
+		t.Fatalf("failed to parse output: %v", err)
+	}
+	if vars["DB_HOST"] != "localhost" {
+		t.Errorf("expected 'localhost', got %q", vars["DB_HOST"])
+	}
+	if vars["API_KEY"] != "sk-123" {
+		t.Errorf("expected 'sk-123', got %q", vars["API_KEY"])
+	}
+}
+
+func TestEnvPullNoForceExistingFile(t *testing.T) {
+	dir, cleanup := setupTestStore(t)
+	defer cleanup()
+
+	outPath := filepath.Join(dir, ".env")
+	os.WriteFile(outPath, []byte("EXISTING=true\n"), 0644)
+
+	err := envPull(outPath, "test-project", false)
+	if err == nil {
+		t.Fatal("expected error when file exists without --force")
+	}
+}
