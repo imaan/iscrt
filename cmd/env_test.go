@@ -268,3 +268,58 @@ func TestMaskValue(t *testing.T) {
 		}
 	}
 }
+
+func TestEnvDeleteProject(t *testing.T) {
+	_, cleanup := setupTestStore(t)
+	defer cleanup()
+
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	os.WriteFile(envPath, []byte("KEY1=val1\nKEY2=val2\n"), 0644)
+	envPush(envPath, "to-delete", "merge")
+
+	os.WriteFile(envPath, []byte("KEY3=val3\n"), 0644)
+	envPush(envPath, "to-keep", "merge")
+
+	count, err := envDelete("to-delete", "")
+	if err != nil {
+		t.Fatalf("delete failed: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 deleted, got %d", count)
+	}
+
+	s := loadTestStore(t)
+	if !s.Has("to-keep/KEY3") {
+		t.Error("to-keep/KEY3 should still exist")
+	}
+	if s.Has("to-delete/KEY1") {
+		t.Error("to-delete/KEY1 should be gone")
+	}
+}
+
+func TestEnvDeleteSingleKey(t *testing.T) {
+	_, cleanup := setupTestStore(t)
+	defer cleanup()
+
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, ".env")
+	os.WriteFile(envPath, []byte("KEY1=val1\nKEY2=val2\n"), 0644)
+	envPush(envPath, "myproject", "merge")
+
+	count, err := envDelete("myproject", "KEY1")
+	if err != nil {
+		t.Fatalf("delete failed: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 deleted, got %d", count)
+	}
+
+	s := loadTestStore(t)
+	if s.Has("myproject/KEY1") {
+		t.Error("KEY1 should be gone")
+	}
+	if !s.Has("myproject/KEY2") {
+		t.Error("KEY2 should still exist")
+	}
+}

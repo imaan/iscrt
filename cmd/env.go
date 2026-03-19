@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -388,4 +389,96 @@ func init() {
 	envCmd.AddCommand(listEnvCmd)
 	listEnvCmd.Flags().String("project", "", "project name")
 	listEnvCmd.Flags().BoolP("reveal", "r", false, "show full values instead of masked")
+
+	envCmd.AddCommand(deleteCmd)
+	deleteCmd.Flags().String("project", "", "project name")
+	deleteCmd.Flags().StringP("key", "k", "", "delete a single key instead of entire project")
+	deleteCmd.Flags().BoolP("force", "f", false, "skip confirmation prompt")
+}
+
+// --- env delete ---
+
+var deleteCmd = &cobra.Command{
+	Use:   "delete",
+	Short: "Delete project secrets from the store",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		project, _ := cmd.Flags().GetString("project")
+		if project == "" {
+			project = currentDirName()
+		}
+		key, _ := cmd.Flags().GetString("key")
+		force, _ := cmd.Flags().GetBool("force")
+
+		if !force {
+			var target string
+			if key != "" {
+				target = fmt.Sprintf("key %q in project %q", key, project)
+			} else {
+				target = fmt.Sprintf("all secrets in project %q", project)
+			}
+			fmt.Printf("Delete %s? [y/N] ", target)
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
+			if answer != "y" && answer != "yes" {
+				fmt.Println("Aborted.")
+				return nil
+			}
+		}
+
+		count, err := envDelete(project, key)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Deleted %d secret(s) from project %q\n", count, project)
+		return nil
+	},
+}
+
+func envDelete(project string, key string) (int, error) {
+	storage := viper.GetString(configKeyStorage)
+	password := []byte(viper.GetString(configKeyPassword))
+
+	b, err := backend.Backends[storage].NewContext(cmdContext, viper.AllSettings())
+	if err != nil {
+		return 0, fmt.Errorf("failed to create backend: %w", err)
+	}
+	exists, err := b.ExistsContext(cmdContext)
+	if err != nil {
+		return 0, err
+	}
+	if !exists {
+		return 0, fmt.Errorf("store not initialized, run 'iscrt init' first")
+	}
+
+	data, err := b.LoadContext(cmdContext)
+	if err != nil {
+		return 0, err
+	}
+	s, err := store.ReadStoreContext(cmdContext, password, data)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	if key != "" {
+		fullKey := project + "/" + key
+		if s.HasContext(cmdContext, fullKey) {
+			s.UnsetContext(cmdContext, fullKey)
+			count = 1
+		}
+	} else {
+		prefix := project + "/"
+		count = s.UnsetPrefixContext(cmdContext, prefix)
+	}
+
+	data, err = store.WriteStoreContext(cmdContext, password, s)
+	if err != nil {
+		return 0, err
+	}
+	if err := b.SaveContext(cmdContext, data); err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
