@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -31,7 +32,11 @@ var pushCmd = &cobra.Command{
 
 		project, _ := cmd.Flags().GetString("project")
 		if project == "" {
-			project = currentDirName()
+			name, ok := gitRepoName()
+			if !ok {
+				return fmt.Errorf("not in a git repository — use --project to specify a project name, or run 'git init' first")
+			}
+			project = name
 		}
 
 		mode, _ := cmd.Flags().GetString("mode")
@@ -141,13 +146,16 @@ func envPush(file string, project string, mode string) error {
 	return nil
 }
 
-// currentDirName returns the basename of the current working directory.
-func currentDirName() string {
-	dir, err := os.Getwd()
+// gitRepoName returns the basename of the git repository root.
+// Returns the repo name and true if found, or empty string and false if not in a git repo.
+func gitRepoName() (string, bool) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	out, err := cmd.Output()
 	if err != nil {
-		return "default"
+		return "", false
 	}
-	return filepath.Base(dir)
+	root := strings.TrimSpace(string(out))
+	return filepath.Base(root), true
 }
 
 // --- env pull ---
@@ -163,7 +171,11 @@ var pullCmd = &cobra.Command{
 		}
 		project, _ := cmd.Flags().GetString("project")
 		if project == "" {
-			project = currentDirName()
+			name, ok := gitRepoName()
+			if !ok {
+				return fmt.Errorf("not in a git repository — use --project to specify a project name")
+			}
+			project = name
 		}
 		force, _ := cmd.Flags().GetBool("force")
 		return envPull(file, project, force)
@@ -412,7 +424,11 @@ var deleteCmd = &cobra.Command{
 			project = args[0]
 		}
 		if project == "" {
-			project = currentDirName()
+			name, ok := gitRepoName()
+			if !ok {
+				return fmt.Errorf("not in a git repository — use --project or pass project name as argument")
+			}
+			project = name
 		}
 		key, _ := cmd.Flags().GetString("key")
 		force, _ := cmd.Flags().GetBool("force")
