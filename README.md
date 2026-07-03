@@ -57,7 +57,10 @@ cd ~/code/my-project
 iscrt env pull                    # writes .env from "my-project/" secrets
 iscrt env pull --force            # overwrite existing .env
 iscrt env pull .env.local         # write to specific file
+iscrt env pull --allow-untracked  # write even if the file isn't gitignored
 ```
+
+By default, `env pull` refuses to write to a file that git would track, so a pull can't accidentally stage plaintext secrets for commit. If the target isn't listed in `.gitignore`, the pull is blocked with a message telling you to add it or pass `--allow-untracked`. Outside a git repository the check is skipped with a warning. For handing secrets to an autonomous agent, prefer [`iscrt run`](#run-commands-with-injected-secrets) over pulling a plaintext `.env`.
 
 ### Browse secrets
 
