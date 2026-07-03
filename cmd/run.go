@@ -86,14 +86,6 @@ files — it does not sandbox the child.`,
 			return err
 		}
 
-		required, _ := cmd.Flags().GetString("require")
-		if missing := missingKeys(secrets, splitKeys(required)); len(missing) > 0 {
-			return fmt.Errorf(
-				"required keys missing from project %q: %s",
-				project, strings.Join(missing, ", "),
-			)
-		}
-
 		only, _ := cmd.Flags().GetString("only")
 		if allow := splitKeys(only); len(allow) > 0 {
 			allowed := make(map[string]bool, len(allow))
@@ -111,6 +103,17 @@ files — it does not sandbox the child.`,
 			delete(secrets, k)
 		}
 
+		// --require is checked *after* filtering, so it guarantees the key
+		// actually reaches the child. Checking before would let
+		// "--require X --except X" pass while X never reaches the child.
+		required, _ := cmd.Flags().GetString("require")
+		if missing := missingKeys(secrets, splitKeys(required)); len(missing) > 0 {
+			return fmt.Errorf(
+				"required keys missing from project %q after filtering: %s",
+				project, strings.Join(missing, ", "),
+			)
+		}
+
 		noInherit, _ := cmd.Flags().GetBool("no-inherit")
 
 		c := exec.Command(args[0], args[1:]...)
@@ -119,6 +122,15 @@ files — it does not sandbox the child.`,
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 
+		// The child stays in iscrt's process group (no Setpgid) so it keeps
+		// the terminal as its foreground group and can read stdin normally
+		// — interactive children (REPLs, dev servers with keypress handlers)
+		// would be SIGTTIN-stopped if backgrounded. The tradeoff: a terminal
+		// Ctrl-C reaches the child both via the process group and via the
+		// forwarder below, so tools using double-SIGINT as force-quit see one
+		// Ctrl-C as two. Acceptable for the batch build/deploy target; a
+		// proper fix needs tcsetpgrp foreground handoff, deferred until an
+		// interactive graceful-shutdown need appears.
 		if err := c.Start(); err != nil {
 			return err
 		}
@@ -168,7 +180,7 @@ files — it does not sandbox the child.`,
 	c.Flags().String("project", "", "project name (default: git repo name)")
 	c.Flags().String("only", "", "comma-separated allowlist: inject only these keys")
 	c.Flags().String("except", "", "comma-separated denylist: inject all keys except these")
-	c.Flags().String("require", "", "comma-separated keys that must exist in the project, or fail")
+	c.Flags().String("require", "", "comma-separated keys that must reach the child (after --only/--except), or fail")
 	c.Flags().Bool("no-inherit", false, "do not inherit the parent environment (child gets PATH and the secrets only)")
 
 	return c

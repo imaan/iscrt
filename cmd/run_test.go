@@ -199,6 +199,41 @@ func TestRunCmdRequireMissing(t *testing.T) {
 	}
 }
 
+func TestRunCmdRequireAfterFiltering(t *testing.T) {
+	skipIfWindows(t)
+
+	// --require must be evaluated after --only/--except: a key that exists
+	// in the store but is filtered out must fail the require check, because
+	// it never reaches the child.
+	cases := []struct {
+		name  string
+		flags []string
+	}{
+		{"except-drops-required", []string{"--require", "MY_KEY", "--except", "MY_KEY"}},
+		{"only-drops-required", []string{"--require", "MY_KEY", "--only", "OTHER_KEY"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			setupRunStore(t, ctrl, map[string]string{
+				"testproj/MY_KEY":    "world",
+				"testproj/OTHER_KEY": "other",
+			})
+
+			argv := append([]string{"--project", "testproj"}, tc.flags...)
+			argv = append(argv, "--", "sh", "-c", "true")
+			err := execRun(t, argv...)
+			if err == nil {
+				t.Fatal("expected require to fail for a filtered-out key")
+			}
+			if !strings.Contains(err.Error(), "MY_KEY") {
+				t.Fatalf("expected MY_KEY named in error, got %q", err.Error())
+			}
+		})
+	}
+}
+
 func TestRunCmdNoInherit(t *testing.T) {
 	skipIfWindows(t)
 	hijack()
