@@ -59,6 +59,25 @@ iscrt env pull --force            # overwrite existing .env
 iscrt env pull .env.local         # write to specific file
 ```
 
+### Run commands with injected secrets
+
+```bash
+cd ~/code/my-project
+iscrt run -- npm run build                            # inject "my-project/" secrets into the child env
+iscrt run --only DATABASE_URL -- npx prisma migrate deploy
+iscrt run --except DEBUG_TOKEN -- ./deploy.sh         # inject everything except these keys
+iscrt run --require API_KEY,DB_URL -- make release    # fail fast if keys are missing
+iscrt run --no-inherit -- env                         # child gets PATH + secrets only
+iscrt run --project other-app -- ./script.sh          # explicit project
+```
+
+Secrets are decrypted in memory and passed to the child process's environment only — they never touch stdout, argv, shell history, or disk. The child's exit code is propagated, and Ctrl-C / SIGTERM are forwarded to the child. This is the recommended way to use secrets in builds, deploys, and AI-agent workflows: unlike `VAR="$(iscrt get KEY)" cmd`, nothing is ever printed.
+
+**Security notes:**
+
+- The master password (`SCRT_PASSWORD`) is always stripped from the child's environment, so a leaky build script exposes at most the injected project secrets — never the whole store.
+- The child process (and anything it spawns) *can* read the injected values. `iscrt run` prevents accidental leaks; it does not sandbox the child. When handing this to an autonomous agent, restrict which child commands it may run at the harness level (e.g. Claude Code permission rules allowing `iscrt run -- npm *` but not `iscrt run -- sh`).
+
 ### Browse secrets
 
 ```bash

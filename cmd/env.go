@@ -395,11 +395,11 @@ func init() {
 	addCommand(envCmd)
 
 	envCmd.AddCommand(pushCmd)
-	pushCmd.Flags().String("project", "", "project name (default: current directory name)")
+	pushCmd.Flags().String("project", "", "project name (default: git repo name)")
 	pushCmd.Flags().String("mode", "merge", "push mode: merge or replace")
 
 	envCmd.AddCommand(pullCmd)
-	pullCmd.Flags().String("project", "", "project name (default: current directory name)")
+	pullCmd.Flags().String("project", "", "project name (default: git repo name)")
 	pullCmd.Flags().BoolP("force", "f", false, "overwrite existing file")
 
 	envCmd.AddCommand(listEnvCmd)
