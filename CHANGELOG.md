@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `iscrt run -- <command> [args...]`: run a command with the project's secrets injected into its environment only — never printed, logged, or written to disk. Supports `--project`, `--only`, `--except`, `--require`, and `--no-inherit`. The child's exit code is propagated and SIGINT/SIGTERM/SIGHUP/SIGQUIT are forwarded to the child. `SCRT_PASSWORD` is always stripped from the child's environment.
+
 ## 0.3.3 - 2022-06-07
 
 ### Added

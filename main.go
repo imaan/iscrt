@@ -40,6 +40,11 @@ func main() {
 }
 
 func handleError(err error) {
+	// A child spawned by `iscrt run` exited non-zero: propagate its code.
+	var exitCodeErr cmd.ExitCodeError
+	if errors.As(err, &exitCodeErr) {
+		os.Exit(exitCodeErr.Code)
+	}
 	var posixErr syscall.Errno
 	if errors.As(err, &posixErr) {
 		os.Exit(int(posixErr))
