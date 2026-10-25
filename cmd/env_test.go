@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/imaan/iscrt/backend"
@@ -159,7 +162,7 @@ func TestEnvPull(t *testing.T) {
 
 	// Pull to new file
 	outPath := filepath.Join(dir, ".env")
-	err := envPull(outPath, "test-project", true)
+	err := envPull(outPath, "test-project", true, false)
 	if err != nil {
 		t.Fatalf("pull failed: %v", err)
 	}
@@ -183,9 +186,121 @@ func TestEnvPullNoForceExistingFile(t *testing.T) {
 	outPath := filepath.Join(dir, ".env")
 	os.WriteFile(outPath, []byte("EXISTING=true\n"), 0644)
 
-	err := envPull(outPath, "test-project", false)
+	err := envPull(outPath, "test-project", false, false)
 	if err == nil {
 		t.Fatal("expected error when file exists without --force")
+	}
+}
+
+// gitInitRepo creates a git repo in dir, isolated from the developer's
+// global/system git config so .gitignore behavior is deterministic in tests.
+func gitInitRepo(t *testing.T, dir string) {
+	t.Helper()
+	// Neutralize global/system config (e.g. a global excludesfile that
+	// ignores .env) so the guard tests only see the repo's own .gitignore.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	cmd := exec.Command("git", "init", "-q", dir)
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+}
+
+// pushForPull seeds the store with one project secret so envPull has
+// something to write.
+func pushForPull(t *testing.T, srcDir, project string) {
+	t.Helper()
+	envPath := filepath.Join(srcDir, "source.env")
+	if err := os.WriteFile(envPath, []byte("API_KEY=sk-123\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := envPush(envPath, project, "merge"); err != nil {
+		t.Fatalf("push failed: %v", err)
+	}
+}
+
+func TestEnvPullGitignoreGuardBlocks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("guard tests require git")
+	}
+	srcDir, cleanup := setupTestStore(t)
+	defer cleanup()
+	pushForPull(t, srcDir, "proj")
+
+	repo := t.TempDir()
+	gitInitRepo(t, repo)
+	t.Chdir(repo)
+
+	// .env is NOT gitignored here → guard must refuse.
+	err := envPull(".env", "proj", false, false)
+	if err == nil {
+		t.Fatal("expected the guard to block an un-gitignored .env")
+	}
+	if !strings.Contains(err.Error(), "gitignore") {
+		t.Fatalf("expected a gitignore error, got %q", err.Error())
+	}
+	if _, statErr := os.Stat(filepath.Join(repo, ".env")); statErr == nil {
+		t.Fatal("guard blocked but .env was still written")
+	}
+}
+
+func TestEnvPullGitignoreGuardAllowsIgnoredFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("guard tests require git")
+	}
+	srcDir, cleanup := setupTestStore(t)
+	defer cleanup()
+	pushForPull(t, srcDir, "proj")
+
+	repo := t.TempDir()
+	gitInitRepo(t, repo)
+	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte(".env\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+
+	if err := envPull(".env", "proj", false, false); err != nil {
+		t.Fatalf("pull to a gitignored .env should succeed, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(repo, ".env")); statErr != nil {
+		t.Fatalf(".env should have been written: %v", statErr)
+	}
+}
+
+func TestEnvPullAllowUntrackedOverridesGuard(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("guard tests require git")
+	}
+	srcDir, cleanup := setupTestStore(t)
+	defer cleanup()
+	pushForPull(t, srcDir, "proj")
+
+	repo := t.TempDir()
+	gitInitRepo(t, repo)
+	t.Chdir(repo)
+
+	// .env NOT ignored, but --allow-untracked overrides the guard.
+	if err := envPull(".env", "proj", false, true); err != nil {
+		t.Fatalf("--allow-untracked should bypass the guard, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(repo, ".env")); statErr != nil {
+		t.Fatalf(".env should have been written: %v", statErr)
+	}
+}
+
+func TestEnvPullOutsideGitRepoWritesWithWarning(t *testing.T) {
+	srcDir, cleanup := setupTestStore(t)
+	defer cleanup()
+	pushForPull(t, srcDir, "proj")
+
+	// A plain temp dir is not a git repo → guard skips, pull still writes.
+	outDir := t.TempDir()
+	outPath := filepath.Join(outDir, ".env")
+	if err := envPull(outPath, "proj", false, false); err != nil {
+		t.Fatalf("pull outside a git repo should still write, got %v", err)
+	}
+	if _, statErr := os.Stat(outPath); statErr != nil {
+		t.Fatalf(".env should have been written: %v", statErr)
 	}
 }
 

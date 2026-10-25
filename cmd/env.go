@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -178,15 +179,53 @@ var pullCmd = &cobra.Command{
 			project = name
 		}
 		force, _ := cmd.Flags().GetBool("force")
-		return envPull(file, project, force)
+		allowUntracked, _ := cmd.Flags().GetBool("allow-untracked")
+		return envPull(file, project, force, allowUntracked)
 	},
 }
 
-func envPull(file string, project string, force bool) error {
+// gitCheckIgnore reports whether file is ignored by git. checked is false
+// when the check could not be performed (not a git repo, git unavailable, or
+// the path is outside the repo); in that case ignored is meaningless and the
+// caller should skip the guard rather than block.
+func gitCheckIgnore(file string) (ignored bool, checked bool) {
+	cmd := exec.Command("git", "check-ignore", "-q", "--", file)
+	err := cmd.Run()
+	if err == nil {
+		return true, true // exit 0: path is ignored
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false, true // exit 1: in a git repo, path is NOT ignored
+	}
+	// exit 128 (not a git repo / path outside repo) or git missing: can't check
+	return false, false
+}
+
+func envPull(file string, project string, force bool, allowUntracked bool) error {
 	// If file exists and not force, error
 	if !force {
 		if _, err := os.Stat(file); err == nil {
 			return fmt.Errorf("%s already exists, use --force to overwrite", file)
+		}
+	}
+
+	// Refuse to write plaintext secrets to a file git would track, so a pull
+	// can't silently stage secrets for commit. Skips gracefully outside a git
+	// repo. Override with --allow-untracked.
+	if !allowUntracked {
+		ignored, checked := gitCheckIgnore(file)
+		switch {
+		case checked && !ignored:
+			return fmt.Errorf(
+				"%s is not gitignored — writing plaintext secrets there risks committing them; add it to .gitignore, or pass --allow-untracked to override",
+				file,
+			)
+		case !checked:
+			fmt.Fprintf(os.Stderr,
+				"warning: could not verify %s is gitignored (not a git repository); writing anyway\n",
+				file,
+			)
 		}
 	}
 
@@ -399,8 +438,9 @@ func init() {
 	pushCmd.Flags().String("mode", "merge", "push mode: merge or replace")
 
 	envCmd.AddCommand(pullCmd)
-	pullCmd.Flags().String("project", "", "project name (default: current directory name)")
+	pullCmd.Flags().String("project", "", "project name (default: git repo name)")
 	pullCmd.Flags().BoolP("force", "f", false, "overwrite existing file")
+	pullCmd.Flags().Bool("allow-untracked", false, "write even if the file is not gitignored (disables the safety guard)")
 
 	envCmd.AddCommand(listEnvCmd)
 	listEnvCmd.Flags().String("project", "", "project name")
